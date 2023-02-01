@@ -214,8 +214,58 @@ let ``empty message is ignored`` () =
 
     checkLogs baseDir.Path []
 
-// TODO
-// - Message with big enough timestamp causes flush.
-// - Big enough timestamp causes flush.
-// - Not big enough timestamp doesn't cause flush.
-// - Dispose doesn't throw exception.
+// It's expected that this test prints info about the exception on stderr.
+[<Test>]
+let ``dispose doesn't throw exception`` () =
+    use baseDir = new TempDirectory()
+    let config = { config with DirFunc = fun date -> Path.Combine(baseDir.Path, date) }
+
+    Assert.DoesNotThrow(fun () ->
+        use writer = new LogWriter(config)
+        writer.AppendMessage(dt, "A"B)
+
+        // We want to test a situation when `Dispose` cannot flush buffered messages.
+        // To ensure that `Dispose` cannot create the log file
+        // we create a directory with the name as the log file.
+        Directory.CreateDirectory(Path.Combine(baseDir.Path, "2023-01-29/log_090000.gz")) |> ignore)
+
+[<Test>]
+let ``message with big enough timestamp causes flush`` () =
+    use baseDir = new TempDirectory()
+    let config = { config with DirFunc = fun date -> Path.Combine(baseDir.Path, date) }
+
+    use writer = new LogWriter(config)
+    writer.AppendMessage(dt, "A"B)
+    // No flush because of timestamp since `MaxSecondsBeforeFlush` wasn't exceeded.
+    writer.AppendMessage(dt.AddSeconds config.MaxSecondsBeforeFlush, "B"B)
+    // Causes flush after appending message to member.
+    writer.AppendMessage(dt.AddSeconds(float config.MaxSecondsBeforeFlush + 1.0), "C"B)
+    writer.AppendMessage(dt.AddSeconds(float config.MaxSecondsBeforeFlush + 1.0), "D"B)  // Goes to new member.
+    writer.FlushMember()  // We need to flush before checking.
+
+    checkLogs baseDir.Path
+        [ "2023-01-29", "log_090000.gz", [ "ABC"B; "D"B ] ]
+
+[<Test>]
+let ``FlushMemberIfTooOld doesn't flush if member isn't too old`` () =
+    use baseDir = new TempDirectory()
+    let config = { config with DirFunc = fun date -> Path.Combine(baseDir.Path, date) }
+
+    use writer = new LogWriter(config)
+    writer.AppendMessage(dt, "A"B)
+    writer.FlushMemberIfTooOld(dt.AddSeconds(float config.MaxSecondsBeforeFlush / 2.0))
+    writer.FlushMemberIfTooOld(dt.AddSeconds config.MaxSecondsBeforeFlush)
+
+    checkLogs baseDir.Path []  // Nothing was flushed.
+
+[<Test>]
+let ``FlushMemberIfTooOld flushes too old member`` () =
+    use baseDir = new TempDirectory()
+    let config = { config with DirFunc = fun date -> Path.Combine(baseDir.Path, date) }
+
+    use writer = new LogWriter(config)
+    writer.AppendMessage(dt, "A"B)
+    writer.FlushMemberIfTooOld(dt.AddSeconds(float config.MaxSecondsBeforeFlush + 1.0))
+
+    checkLogs baseDir.Path
+        [ "2023-01-29", "log_090000.gz", [ "A"B ] ]
