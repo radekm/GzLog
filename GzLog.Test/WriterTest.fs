@@ -36,7 +36,7 @@ type DirName = string
 let readMembers (file : string) : MemberData list =
     use stream = new FileStream(file, FileMode.Open)
     let n = 1024 * 1024
-    Utils.membersFromStream stream n n
+    LogReader.membersFromStream stream n n
     |> Seq.map (fun m -> m.Decompressed.ToArray())
     |> Seq.toList
 

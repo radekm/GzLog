@@ -1,4 +1,4 @@
-module GzLog.Test.Utils
+module GzLog.LogReader
 
 open System
 open System.Buffers
@@ -10,7 +10,18 @@ type Member = { Decompressed : Memory<byte>
                 CompressedPos : int64
                 CompressedLen : int }
 
+// Note: It could be confusing that `maxCompressedMemberLen` and `maxDecompressedMemberLen`
+// may not be hard limits. These are used when calling `MemoryPool.Shared.Rent`
+// and `Rent` could return bigger buffer than requested.
+
 /// Stream `compressed` must be open while using the sequence.
+///
+/// When choosing `maxDecompressedMemberLen` note that each member contains at least one message
+/// and messages are never split into several members.
+/// This means that if a message size was bigger than `LogWriterConfig.MaxDecompressedMemberSize`
+/// then the decompressed member will also be bigger than `LogWriterConfig.MaxDecompressedMemberSize`.
+///
+/// Also note that compressed member could be bigger than decompressed.
 let membersFromStream (compressed : Stream) (maxCompressedMemberLen : int) (maxDecompressedMemberLen : int) = seq {
     // When using `use mutable inputOwner` compiler thinks that value is not mutable.
     let mutable inputOwner = MemoryPool.Shared.Rent(min (4 * 1024 * 1024) maxCompressedMemberLen)

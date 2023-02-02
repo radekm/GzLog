@@ -29,10 +29,15 @@ type private LogWriterState =
     | NonEmptyMember of FileState * DecompressedMemberState
 
 type LogWriterConfig =
-    { MaxDecompressedMemberSize : int
-      MaxFileSize : int64  // This is compressed size.
+    { // Member will contain at least one message and messages are never split into more members.
+      // This means that `MaxDecompressedMemberSize` limit will be breached if the message is bigger.
+      MaxDecompressedMemberSize : int
+      // This is compressed size. File will contain at least one member and members are never split into more files.
+      // This means that `MaxFileSize` limit will be breached if compressed member is bigger.
+      MaxFileSize : int64
       MaxSecondsBeforeFlush : int
-      DirFunc : string -> string  // Pure function. Must be injective.
+      // Pure function. Must be injective.
+      DirFunc : string -> string
     }
 
 [<Sealed>]

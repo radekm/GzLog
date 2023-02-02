@@ -21,6 +21,7 @@
 
     <ItemGroup>
         <Compile Include="Writer.fs" />
+        <Compile Include="Reader.fs" />
     </ItemGroup>
 
     <ItemGroup>
