@@ -173,13 +173,13 @@ type LogWriter(config : LogWriterConfig) =
             if timestamp - decompressedMemberState.Timestamp > TimeSpan.FromSeconds config.MaxSecondsBeforeFlush then
                 me.FlushMember()
 
-    member me.AppendMessage(timestamp : DateTimeOffset, message : Span<byte>) =
+    member me.AppendMessage(timestamp : DateTimeOffset, message : ReadOnlySpan<byte>) =
         check ()
 
         if not message.IsEmpty then
             me.AppendNonEmptyMessage(timestamp, message)
 
-    member private me.AppendNonEmptyMessage(timestamp : DateTimeOffset, message : Span<byte>) =
+    member private me.AppendNonEmptyMessage(timestamp : DateTimeOffset, message : ReadOnlySpan<byte>) =
         if message.IsEmpty then
             failwith "Empty message"
 
