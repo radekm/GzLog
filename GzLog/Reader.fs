@@ -10,9 +10,12 @@ type Member = { Decompressed : Memory<byte>
                 CompressedPos : int64
                 CompressedLen : int }
 
-// Note: It could be confusing that `maxCompressedMemberLen` and `maxDecompressedMemberLen`
-// may not be hard limits. These are used when calling `MemoryPool.Shared.Rent`
-// and `Rent` could return bigger buffer than requested.
+// Note: It could be confusing that `maxCompressedMemberLen`
+// may not be hard limit. It is used when calling `MemoryPool.Shared.Rent`
+// and `Rent` could return a bigger buffer than requested.
+//
+// On the other hand `maxDecompressedMemberLen` is hard limit
+// (this follows from the implementation of `BufferedDecompressor`).
 
 /// Stream `compressed` must be open while using the sequence.
 ///
@@ -28,17 +31,14 @@ let membersFromStream (compressed : Stream) (maxCompressedMemberLen : int) (maxD
     use _ = { new IDisposable with
                 override _.Dispose() = inputOwner.Dispose() }
     let mutable inputMemory = inputOwner.Memory
-    let mutable outputOwner = MemoryPool.Shared.Rent(min (32 * 1024 * 1024) maxDecompressedMemberLen)
-    use _ = { new IDisposable with
-                override _.Dispose() = outputOwner.Dispose() }
-    let mutable outputMemory = outputOwner.Memory
 
     let mutable bytesInInputBuffer = 0
     let mutable eof = false
 
     let mutable pos = compressed.Position  // Measured from the beginning of the stream.
 
-    use decompressor = new Decompressor()
+    use decompressor =
+        new BufferedDecompressor(min (8 * 1024 * 1024) maxDecompressedMemberLen, maxDecompressedMemberLen)
     while not eof || bytesInInputBuffer > 0 do
         // Fill input buffer.
         while not eof &&  bytesInInputBuffer < inputMemory.Length do
@@ -49,11 +49,10 @@ let membersFromStream (compressed : Stream) (maxCompressedMemberLen : int) (maxD
 
         // Empty buffer is not valid gzip member.
         if bytesInInputBuffer > 0 then
-            let result, read, written =
-                decompressor.Decompress(inputMemory.Span.Slice(0, bytesInInputBuffer), outputMemory.Span)
+            let result, read = decompressor.Decompress(inputMemory.Span.Slice(0, bytesInInputBuffer))
             match result with
             | DecompressionResult.Success ->
-                yield { Decompressed = outputMemory.Slice(0, written)
+                yield { Decompressed = decompressor.DecompressedData
                         CompressedPos = pos
                         CompressedLen = read }
 
@@ -63,14 +62,7 @@ let membersFromStream (compressed : Stream) (maxCompressedMemberLen : int) (maxD
                 // Move unused input bytes to the beginning of input buffer.
                 inputMemory.Span.Slice(read, bytesInInputBuffer).CopyTo(inputMemory.Span)
             | DecompressionResult.InsufficientSpace ->
-                let n = min (2 * outputMemory.Length) maxDecompressedMemberLen
-                if n > outputMemory.Length then
-                    // Enlarge output buffer.
-                    outputOwner.Dispose()
-                    outputOwner <- MemoryPool.Shared.Rent(n)
-                    outputMemory <- outputOwner.Memory
-                else
-                    failwith $"Output buffer len %d{outputMemory.Length} is too small"
+                failwith $"Output buffer len %d{maxDecompressedMemberLen} is too small"
             | DecompressionResult.BadData ->
                 // If we're not at the end of stream it may help to enlarge
                 // input buffer and load more compressed data.
