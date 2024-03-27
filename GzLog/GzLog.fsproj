@@ -1,12 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net7.0</TargetFramework>
+        <TargetFramework>net8.0</TargetFramework>
 
         <PackageId>GzLog</PackageId>
         <PackageVersion>0.6.0</PackageVersion>
         <Authors>Radek Micek</Authors>
-        <Copyright>Copyright (c) Radek Micek 2023</Copyright>
+        <Copyright>Copyright (c) Radek Micek 2023-2024</Copyright>
         <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
         <Description>
             Package for storing messages in event-sourced systems.
@@ -26,8 +26,8 @@
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="LibDeflateGzip" Version="0.5.0" />
-      <PackageReference Update="FSharp.Core" Version="7.0.401" />
+      <PackageReference Include="LibDeflateGzip" Version="0.6.0" />
+      <PackageReference Update="FSharp.Core" Version="8.0.200" />
     </ItemGroup>
 
 </Project>
